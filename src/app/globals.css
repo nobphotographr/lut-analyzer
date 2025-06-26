@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root {
+  /* GLAZE Design System Colors */
+  --glaze-primary: #3d3d3d;
+  --glaze-secondary: #2d2d2d;
+  --glaze-accent: #4a90e2;
+  --glaze-accent-dark: #357abd;
+  --glaze-accent-light: #6ba3e8;
+  --glaze-text-primary: #ffffff;
+  --glaze-text-secondary: #e0e0e0;
+  --glaze-text-muted: #ccc;
+  --glaze-text-subtle: #bbb;
+  --glaze-border: rgb(82, 82, 82);
+  --glaze-button-bg: rgb(60, 60, 60);
+  
+  /* Safe area for mobile */
+  --safe-area-inset-top: env(safe-area-inset-top);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom);
+}
+
+@theme inline {
+  /* GLAZE Color System */
+  --color-glaze-primary: var(--glaze-primary);
+  --color-glaze-secondary: var(--glaze-secondary);
+  --color-glaze-accent: var(--glaze-accent);
+  --color-glaze-accent-dark: var(--glaze-accent-dark);
+  --color-glaze-accent-light: var(--glaze-accent-light);
+  --color-glaze-text-primary: var(--glaze-text-primary);
+  --color-glaze-text-secondary: var(--glaze-text-secondary);
+  --color-glaze-text-muted: var(--glaze-text-muted);
+  --color-glaze-text-subtle: var(--glaze-text-subtle);
+  --color-glaze-border: var(--glaze-border);
+  --color-glaze-button-bg: var(--glaze-button-bg);
+  
+  /* Typography - GLAZE Font System */
+  --font-sans: "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ Pro W3", 'Inter', system-ui, -apple-system, sans-serif;
+  
+  /* Breakpoints */
+  --breakpoint-xs: 375px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+  
+  /* Spacing */
+  --spacing-safe-top: var(--safe-area-inset-top);
+  --spacing-safe-bottom: var(--safe-area-inset-bottom);
+}
+
+/* GLAZE Base Styles */
+body {
+  background: var(--glaze-primary);
+  color: var(--glaze-text-primary);
+  font-family: "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ Pro W3", 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--glaze-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--glaze-accent);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--glaze-accent-light);
+}
+
+/* Touch-friendly design elements */
+button, [role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Animation utilities */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
