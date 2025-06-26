@@ -6,7 +6,18 @@ export default function Home() {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [analysisResult, setAnalysisResult] = useState<{
+    baseLut: [string, string, string];
+    adjustmentLut: [string, string, string];
+    fineTuneLut: [string, string, string];
+    combination: [string, string][];
+    debugData: {
+      avgWarmBias: number;
+      avgContrast: number;
+      avgGreenPush: number;
+      imageCount: number;
+    };
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -147,6 +158,7 @@ export default function Home() {
                 <div className="grid grid-cols-3 gap-3">
                   {selectedImages.map((file, index) => (
                     <div key={index} className="aspect-square bg-glaze-secondary rounded-lg overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={URL.createObjectURL(file)}
                         alt={`Preview ${index + 1}`}
