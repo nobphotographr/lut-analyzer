@@ -1,7 +1,86 @@
 /**
- * Claude Code版と同じRGB分析ロジックをJavaScriptに移植
- * analyze_hayashi_simple.py の完全移植版
+ * Turner Blend 5方向性ブレンドレシピシステム
+ * analyze_hayashi_blend_recipes.py の完全移植版
+ * RGB基本分析 + 全20個LUT対応ブレンドレシピ生成
  */
+
+// 全20個LUTのデータベース（方向性別分類）
+const LUT_DATABASE = {
+  // ベースLUT - 主要な色調担当
+  base_luts: {
+    "Maverick.cube": {warmth: 0.85, contrast: 0.6, intensity: 0.8, mood: "cinematic"},
+    "F-PRO400H.cube": {warmth: 0.65, contrast: 0.7, intensity: 0.7, mood: "natural"},
+    "K-Chrome.cube": {warmth: 0.45, contrast: 0.6, intensity: 0.6, mood: "clean"},
+    "Anderson.cube": {warmth: 0.75, contrast: 0.8, intensity: 0.9, mood: "dramatic"},
+    "Nolan.cube": {warmth: 0.2, contrast: 0.9, intensity: 0.8, mood: "cold"},
+    "Blue sierra.cube": {warmth: 0.15, contrast: 0.7, intensity: 0.6, mood: "cool"},
+    "C-400D.cube": {warmth: 0.3, contrast: 0.5, intensity: 0.5, mood: "vintage"},
+    "k-ektar.cube": {warmth: 0.4, contrast: 0.6, intensity: 0.6, mood: "classic"}
+  },
+  
+  // 調整LUT - コントラスト・明度担当
+  adjustment_luts: {
+    "clean contrast.cube": {contrast_boost: 0.9, clarity: 0.8, strength: 0.7},
+    "highland.cube": {contrast_boost: 0.6, clarity: 0.7, strength: 0.6},
+    "Odyssey.cube": {contrast_boost: 0.7, clarity: 0.6, strength: 0.8},
+    "Revenant.cube": {contrast_boost: 0.8, clarity: 0.9, strength: 0.7},
+    "pastel-light.cube": {contrast_boost: 0.3, clarity: 0.4, strength: 0.4},
+    "Smorky silversalt.cube": {contrast_boost: 0.5, clarity: 0.6, strength: 0.5}
+  },
+  
+  // エフェクトLUT - 特殊効果担当
+  effect_luts: {
+    "anime pastel.cube": {creativity: 0.9, stylization: 0.8, uniqueness: 0.9},
+    "cyber neon.cube": {creativity: 0.8, stylization: 0.9, uniqueness: 0.8},
+    "Blade neon.cube": {creativity: 0.7, stylization: 0.8, uniqueness: 0.7},
+    "blue moment.cube": {creativity: 0.6, stylization: 0.6, uniqueness: 0.6},
+    "D-Anderson.cube": {creativity: 0.7, stylization: 0.7, uniqueness: 0.8},
+    "L-green.cube": {creativity: 0.4, stylization: 0.5, uniqueness: 0.5}
+  }
+};
+
+// 5方向性の定義とレシピテンプレート
+const DIRECTION_TEMPLATES = {
+  natural: {
+    name: "🎯 ナチュラル補正",
+    concept: "写真本来の美しさを引き出す",
+    base_priority: ["K-Chrome.cube", "F-PRO400H.cube", "k-ektar.cube"],
+    adjustment_priority: ["clean contrast.cube", "highland.cube", "Odyssey.cube"],
+    effect_priority: ["L-green.cube", "blue moment.cube", "D-Anderson.cube"]
+  },
+  
+  cinematic: {
+    name: "🎬 シネマティック",
+    concept: "映画的・ドラマティックな演出",
+    base_priority: ["Anderson.cube", "Maverick.cube", "Nolan.cube"],
+    adjustment_priority: ["clean contrast.cube", "Revenant.cube", "Odyssey.cube"],
+    effect_priority: ["D-Anderson.cube", "cyber neon.cube", "Blade neon.cube"]
+  },
+  
+  mood: {
+    name: "🌅 ムード重視",
+    concept: "感情や雰囲気を強調",
+    base_priority: ["Maverick.cube", "F-PRO400H.cube", "Anderson.cube"],
+    adjustment_priority: ["highland.cube", "pastel-light.cube", "Smorky silversalt.cube"],
+    effect_priority: ["blue moment.cube", "L-green.cube", "anime pastel.cube"]
+  },
+  
+  artistic: {
+    name: "🎨 アーティスティック",
+    concept: "創造的・表現重視",
+    base_priority: ["F-PRO400H.cube", "Anderson.cube", "Blue sierra.cube"],
+    adjustment_priority: ["pastel-light.cube", "highland.cube", "Smorky silversalt.cube"],
+    effect_priority: ["anime pastel.cube", "cyber neon.cube", "Blade neon.cube"]
+  },
+  
+  film: {
+    name: "📷 フィルム風",
+    concept: "アナログ・ヴィンテージ感",
+    base_priority: ["C-400D.cube", "k-ektar.cube", "Blue sierra.cube"],
+    adjustment_priority: ["Smorky silversalt.cube", "pastel-light.cube", "highland.cube"],
+    effect_priority: ["blue moment.cube", "L-green.cube", "D-Anderson.cube"]
+  }
+};
 
 export interface ImageAnalysisResult {
   rgbMeans: [number, number, number];
@@ -9,6 +88,8 @@ export interface ImageAnalysisResult {
   coolBias: number;
   greenPush: number;
   overallContrast: number;
+  brightness: number;
+  saturation: number;
   filename: string;
 }
 
@@ -16,10 +97,59 @@ export interface MultiImageAnalysisResult {
   avgWarmBias: number;
   avgContrast: number;
   avgGreenPush: number;
+  avgBrightness: number;
+  avgSaturation: number;
   imageCount: number;
   individualResults: ImageAnalysisResult[];
 }
 
+export interface BlendItem {
+  category: string;
+  lut: string;
+  strength: string;
+  score: number;
+}
+
+export interface BlendRecipe {
+  name: string;
+  concept: string;
+  blend: BlendItem[];
+}
+
+export interface BlendRecipeRecommendation {
+  natural: BlendRecipe;
+  cinematic: BlendRecipe;
+  mood: BlendRecipe;
+  artistic: BlendRecipe;
+  film: BlendRecipe;
+}
+
+interface BaseLutProperties {
+  warmth: number;
+  contrast: number;
+  intensity: number;
+  mood: string;
+}
+
+interface AdjustmentLutProperties {
+  contrast_boost: number;
+  clarity: number;
+  strength: number;
+}
+
+interface EffectLutProperties {
+  creativity: number;
+  stylization: number;
+  uniqueness: number;
+}
+
+type LutProperties = BaseLutProperties | AdjustmentLutProperties | EffectLutProperties;
+
+interface LutDatabase {
+  [key: string]: LutProperties;
+}
+
+// Legacy interface for backward compatibility
 export interface LUTRecommendation {
   baseLut: [string, string, string];
   adjustmentLut: [string, string, string];
@@ -98,17 +228,29 @@ export async function analyzeImageColors(file: File): Promise<ImageAnalysisResul
     const coolBias = bMean - rMean;  // 寒色バイアス（青 - 赤）
     const greenPush = gMean - (rMean + bMean) / 2;  // 緑の強さ
     
-    // コントラスト分析（標準偏差）- Claude Code版と同じ
-    let rStd: number, gStd: number, bStd: number;
-    try {
-      rStd = calculateStandardDeviation(rValues);
-      gStd = calculateStandardDeviation(gValues);
-      bStd = calculateStandardDeviation(bValues);
-    } catch {
-      rStd = gStd = bStd = 0;
+    // コントラスト・明度・彩度分析（Claude Code版と同じ）
+    const luminance: number[] = [];
+    const saturationValues: number[] = [];
+    
+    for (let i = 0; i < pixels.length; i += 4) {
+      const r = pixels[i] / 255.0;
+      const g = pixels[i + 1] / 255.0;
+      const b = pixels[i + 2] / 255.0;
+      
+      // 輝度計算
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      luminance.push(lum);
+      
+      // 彩度計算
+      const maxVal = Math.max(r, g, b);
+      const minVal = Math.min(r, g, b);
+      const sat = maxVal > 0 ? (maxVal - minVal) / maxVal : 0;
+      saturationValues.push(sat);
     }
     
-    const overallContrast = (rStd + gStd + bStd) / 3;
+    const overallContrast = calculateStandardDeviation(luminance);
+    const brightness = luminance.reduce((sum, val) => sum + val, 0) / luminance.length;
+    const saturation = saturationValues.reduce((sum, val) => sum + val, 0) / saturationValues.length;
     
     return {
       rgbMeans: [rMean, gMean, bMean],
@@ -116,6 +258,8 @@ export async function analyzeImageColors(file: File): Promise<ImageAnalysisResul
       coolBias,
       greenPush,
       overallContrast,
+      brightness,
+      saturation,
       filename: file.name
     };
     
@@ -146,6 +290,8 @@ export async function analyzeMultipleImages(files: File[]): Promise<MultiImageAn
   const totalWarmBias = results.reduce((sum, result) => sum + result.warmBias, 0);
   const totalContrast = results.reduce((sum, result) => sum + result.overallContrast, 0);
   const totalGreenPush = results.reduce((sum, result) => sum + result.greenPush, 0);
+  const totalBrightness = results.reduce((sum, result) => sum + result.brightness, 0);
+  const totalSaturation = results.reduce((sum, result) => sum + result.saturation, 0);
   
   const count = results.length;
   
@@ -153,13 +299,133 @@ export async function analyzeMultipleImages(files: File[]): Promise<MultiImageAn
     avgWarmBias: totalWarmBias / count,
     avgContrast: totalContrast / count,
     avgGreenPush: totalGreenPush / count,
+    avgBrightness: totalBrightness / count,
+    avgSaturation: totalSaturation / count,
     imageCount: count,
     individualResults: results
   };
 }
 
 /**
- * LUT推奨ロジック（Claude Code版と完全同じ閾値とロジック）
+ * 写真特徴とLUT特性の親和性スコア計算
+ */
+function calculateLutAffinity(photoAnalysis: MultiImageAnalysisResult, lutName: string, lutProperties: LutProperties, category: string): number {
+  let score = 0;
+  
+  if (category === "base" && 'warmth' in lutProperties) {
+    // ベースLUT: 暖色・コントラスト・明度適合性
+    const warmthMatch = 1 - Math.abs(photoAnalysis.avgWarmBias - (lutProperties.warmth - 0.5));
+    score += warmthMatch * 0.5;
+    
+    const contrastMatch = 1 - Math.abs(photoAnalysis.avgContrast - lutProperties.contrast);
+    score += contrastMatch * 0.3;
+    
+    const intensityMatch = 1 - Math.abs(photoAnalysis.avgSaturation - lutProperties.intensity);
+    score += intensityMatch * 0.2;
+    
+  } else if (category === "adjustment" && 'contrast_boost' in lutProperties) {
+    // 調整LUT: コントラストニーズとの適合性
+    if (photoAnalysis.avgContrast > 0.25) {
+      score += lutProperties.contrast_boost * 0.7;
+    } else {
+      score += (1 - lutProperties.contrast_boost) * 0.7;
+    }
+    
+    score += lutProperties.clarity * photoAnalysis.avgSaturation * 0.3;
+    
+  } else if (category === "effect" && 'creativity' in lutProperties) {
+    // エフェクトLUT: 創造性・ユニークネス
+    const creativityPotential = photoAnalysis.avgSaturation * 0.4 + (1 - photoAnalysis.avgBrightness) * 0.3 + photoAnalysis.avgContrast * 0.3;
+    score += lutProperties.creativity * creativityPotential * 0.6;
+    score += lutProperties.uniqueness * 0.4;
+  }
+  
+  return Math.max(0, Math.min(1, score));
+}
+
+/**
+ * 親和性スコアに基づく適用強度計算
+ */
+function calculateBlendStrength(affinityScore: number, baseStrength: number = 70): number {
+  // スコアに応じて40-85%の範囲で調整
+  const strength = baseStrength + (affinityScore - 0.5) * 30;
+  return Math.max(40, Math.min(85, Math.round(strength)));
+}
+
+/**
+ * 5方向性のブレンドレシピ生成
+ */
+export function generateBlendRecipes(photoAnalysis: MultiImageAnalysisResult): BlendRecipeRecommendation {
+  const recipes = {} as BlendRecipeRecommendation;
+  
+  for (const [directionKey, template] of Object.entries(DIRECTION_TEMPLATES)) {
+    const recipe: BlendRecipe = {
+      name: template.name,
+      concept: template.concept,
+      blend: []
+    };
+    
+    // 各カテゴリから最適LUTを選択
+    const categories = [
+      { category: "base", priority: template.base_priority, database: LUT_DATABASE.base_luts },
+      { category: "adjustment", priority: template.adjustment_priority, database: LUT_DATABASE.adjustment_luts },
+      { category: "effect", priority: template.effect_priority, database: LUT_DATABASE.effect_luts }
+    ];
+    
+    for (const { category, priority, database } of categories) {
+      let bestLut: string | null = null;
+      let bestScore = 0;
+      
+      // 優先順位に従ってLUTを評価
+      for (const lutName of priority) {
+        if (lutName in database) {
+          const score = calculateLutAffinity(photoAnalysis, lutName, (database as LutDatabase)[lutName], category);
+          if (score > bestScore) {
+            bestScore = score;
+            bestLut = lutName;
+          }
+        }
+      }
+      
+      // フォールバック: 優先リストになければ全体から選択
+      if (!bestLut) {
+        for (const [lutName, properties] of Object.entries(database)) {
+          const score = calculateLutAffinity(photoAnalysis, lutName, properties, category);
+          if (score > bestScore) {
+            bestScore = score;
+            bestLut = lutName;
+          }
+        }
+      }
+      
+      // ブレンド強度計算
+      if (bestLut) {
+        let strength: number;
+        if (category === "base") {
+          strength = calculateBlendStrength(bestScore, 75);
+        } else if (category === "adjustment") {
+          strength = calculateBlendStrength(bestScore, 40);
+        } else { // effect
+          strength = calculateBlendStrength(bestScore, 25);
+        }
+        
+        recipe.blend.push({
+          category,
+          lut: bestLut,
+          strength: `${strength}%`,
+          score: bestScore
+        });
+      }
+    }
+    
+    recipes[directionKey as keyof BlendRecipeRecommendation] = recipe;
+  }
+  
+  return recipes;
+}
+
+/**
+ * LUT推奨ロジック（Legacy - 後方互換性のため）
  */
 export function recommendLUTs(analysis: MultiImageAnalysisResult): LUTRecommendation {
   const { avgWarmBias, avgContrast, avgGreenPush } = analysis;

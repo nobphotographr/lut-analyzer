@@ -1,23 +1,24 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import type { BlendRecipeRecommendation, BlendItem } from '@/lib/imageAnalyzer';
 
 export default function Home() {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<{
-    baseLut: [string, string, string];
-    adjustmentLut: [string, string, string];
-    fineTuneLut: [string, string, string];
-    combination: [string, string][];
+    recipes: BlendRecipeRecommendation;
     debugData: {
       avgWarmBias: number;
       avgContrast: number;
       avgGreenPush: number;
+      avgBrightness: number;
+      avgSaturation: number;
       imageCount: number;
     };
   } | null>(null);
+  const [activeTab, setActiveTab] = useState<'natural' | 'cinematic' | 'mood' | 'artistic' | 'film'>('natural');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -54,24 +55,23 @@ export default function Home() {
     setIsAnalyzing(true);
     
     try {
-      // Claude Code版と同じRGB分析を実行
-      const { analyzeMultipleImages, recommendLUTs } = await import('@/lib/imageAnalyzer');
+      // 5方向性ブレンドレシピ分析を実行
+      const { analyzeMultipleImages, generateBlendRecipes } = await import('@/lib/imageAnalyzer');
       
       const analysisResult = await analyzeMultipleImages(selectedImages);
       
       if (analysisResult) {
-        const recommendations = recommendLUTs(analysisResult);
+        const recipes = generateBlendRecipes(analysisResult);
         
         setAnalysisResult({
-          baseLut: recommendations.baseLut,
-          adjustmentLut: recommendations.adjustmentLut,
-          fineTuneLut: recommendations.fineTuneLut,
-          combination: recommendations.combination,
+          recipes,
           // デバッグ用に分析データも保存
           debugData: {
             avgWarmBias: analysisResult.avgWarmBias,
             avgContrast: analysisResult.avgContrast,
             avgGreenPush: analysisResult.avgGreenPush,
+            avgBrightness: analysisResult.avgBrightness,
+            avgSaturation: analysisResult.avgSaturation,
             imageCount: analysisResult.imageCount
           }
         });
@@ -89,22 +89,33 @@ export default function Home() {
   const copyToClipboard = () => {
     if (!analysisResult) return;
     
-    const text = `🎬 あなたの写真スタイル再現版:
-1. ${analysisResult.combination[0][0]} - ${analysisResult.combination[0][1]}
-2. ${analysisResult.combination[1][0]} - ${analysisResult.combination[1][1]}
-3. ${analysisResult.combination[2][0]} - ${analysisResult.combination[2][1]}`;
+    const recipe = analysisResult.recipes[activeTab];
+    const text = `${recipe.name}:
+${recipe.blend.map((item, index) => 
+      `${index + 1}. ${item.lut} - ${item.strength}`
+    ).join('\n')}
+
+💡 Sequential Cascade方式で上から順番に適用してください`;
     
     navigator.clipboard.writeText(text);
   };
+
+  const tabConfig = [
+    { key: 'natural' as const, icon: '🎯', label: 'ナチュラル' },
+    { key: 'cinematic' as const, icon: '🎬', label: 'シネマティック' },
+    { key: 'mood' as const, icon: '🌅', label: 'ムード' },
+    { key: 'artistic' as const, icon: '🎨', label: 'アーティスティック' },
+    { key: 'film' as const, icon: '📷', label: 'フィルム風' }
+  ];
 
   return (
     <div className="min-h-screen bg-glaze-primary text-glaze-text-primary">
       {/* Header */}
       <header className="border-b border-glaze-border px-6 py-4">
         <div className="max-w-6xl mx-auto">
-          <h1 className="text-2xl font-bold text-glaze-text-primary">🎨 GLAZE Analyzer</h1>
+          <h1 className="text-2xl font-bold text-glaze-text-primary">🎨 Turner Blend Photo Analyzer</h1>
           <p className="text-glaze-text-secondary text-sm mt-1">
-            Simple LUT Recommendation Engine
+            5方向性ブレンドレシピ推奨システム
           </p>
         </div>
       </header>
@@ -182,7 +193,7 @@ export default function Home() {
 
           {/* Right Column - Analysis Results */}
           <div className="space-y-6">
-            <h2 className="text-lg font-semibold text-glaze-text-primary">🎯 LUT分析結果</h2>
+            <h2 className="text-lg font-semibold text-glaze-text-primary">🎯 写真分析結果</h2>
             
             {!analysisResult && !isAnalyzing && (
               <div className="bg-glaze-secondary rounded-lg p-8 text-center">
@@ -205,43 +216,96 @@ export default function Home() {
 
             {analysisResult && (
               <div className="space-y-6">
-                {/* Final Recommendation */}
-                <div className="bg-glaze-accent/10 border border-glaze-accent/30 rounded-lg p-6">
-                  <h3 className="font-semibold text-glaze-text-primary mb-3">✨ 推奨組み合わせ</h3>
-                  <p className="text-glaze-text-secondary mb-3">🎬 あなたの写真スタイル再現版:</p>
-                  <div className="space-y-2">
-                    {analysisResult.combination.map((item: string[], index: number) => (
-                      <div key={index} className="bg-glaze-primary/50 rounded p-3 font-mono text-sm">
-                        {index + 1}. {item[0]} - {item[1]}
+                {/* Photo Analysis Summary */}
+                <div className="bg-glaze-secondary/50 rounded-lg p-4">
+                  <h3 className="font-semibold text-glaze-text-primary mb-3">📊 写真特徴</h3>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>暖色バイアス: {analysisResult.debugData.avgWarmBias.toFixed(3)}</div>
+                    <div>緑プッシュ: {analysisResult.debugData.avgGreenPush.toFixed(3)}</div>
+                    <div>コントラスト: {analysisResult.debugData.avgContrast.toFixed(3)}</div>
+                    <div>明度: {analysisResult.debugData.avgBrightness.toFixed(3)}</div>
+                    <div>彩度: {analysisResult.debugData.avgSaturation.toFixed(3)}</div>
+                    <div>画像数: {analysisResult.debugData.imageCount}</div>
+                  </div>
+                </div>
+
+                {/* Direction Tabs */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-glaze-text-primary">🎨 5方向性ブレンドレシピ</h3>
+                  
+                  {/* Tab Navigation */}
+                  <div className="flex flex-wrap gap-2">
+                    {tabConfig.map((tab) => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          activeTab === tab.key
+                            ? 'bg-glaze-accent text-white'
+                            : 'bg-glaze-secondary text-glaze-text-secondary hover:bg-glaze-accent/20'
+                        }`}
+                      >
+                        {tab.icon} {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Active Recipe Display */}
+                  <div className="bg-glaze-accent/10 border border-glaze-accent/30 rounded-lg p-6">
+                    <div className="mb-4">
+                      <h4 className="font-semibold text-glaze-text-primary mb-2">
+                        {analysisResult.recipes[activeTab].name}
+                      </h4>
+                      <p className="text-glaze-text-secondary text-sm">
+                        {analysisResult.recipes[activeTab].concept}
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2 mb-4">
+                      {analysisResult.recipes[activeTab].blend.map((item, index) => {
+                        const categoryIcon = item.category === "base" ? "🎨" : item.category === "adjustment" ? "🔧" : "✨";
+                        return (
+                          <div key={index} className="bg-glaze-primary/50 rounded p-3">
+                            <div className="font-mono text-sm">
+                              {index + 1}. {categoryIcon} {item.lut} - {item.strength}
+                            </div>
+                            <div className="text-xs text-glaze-text-muted mt-1">
+                              適合スコア: {item.score.toFixed(3)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    <button
+                      onClick={copyToClipboard}
+                      className="w-full bg-glaze-accent hover:bg-glaze-accent-dark text-white py-2 px-4 rounded font-medium transition-colors"
+                    >
+                      {analysisResult.recipes[activeTab].name}をコピー
+                    </button>
+                  </div>
+                </div>
+
+                {/* 全方向性レシピ一覧（詳細表示） */}
+                <details className="bg-glaze-secondary/50 rounded-lg p-4">
+                  <summary className="text-glaze-text-muted text-sm cursor-pointer mb-2">
+                    全5方向性のレシピを一覧表示
+                  </summary>
+                  <div className="space-y-4 mt-4">
+                    {Object.entries(analysisResult.recipes).map(([key, recipe]) => (
+                      <div key={key} className="border border-glaze-border rounded p-3">
+                        <h5 className="font-medium text-glaze-text-primary mb-2">{recipe.name}</h5>
+                        <div className="space-y-1">
+                          {recipe.blend.map((item: BlendItem, index: number) => (
+                            <div key={index} className="text-xs font-mono text-glaze-text-secondary">
+                              {index + 1}. {item.lut} - {item.strength} (スコア: {item.score.toFixed(3)})
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
-                  
-                  <button
-                    onClick={copyToClipboard}
-                    className="mt-4 w-full bg-glaze-accent hover:bg-glaze-accent-dark text-white py-2 px-4 rounded font-medium transition-colors"
-                  >
-                    設定をコピー
-                  </button>
-                </div>
-
-                {/* デバッグ情報（開発時のみ表示） */}
-                {analysisResult.debugData && (
-                  <details className="bg-glaze-secondary/50 rounded-lg p-4">
-                    <summary className="text-glaze-text-muted text-sm cursor-pointer mb-2">
-                      詳細分析データを表示 (開発用)
-                    </summary>
-                    <div className="text-xs text-glaze-text-muted space-y-1 font-mono">
-                      <div>画像数: {analysisResult.debugData.imageCount}</div>
-                      <div>暖色バイアス: {analysisResult.debugData.avgWarmBias.toFixed(6)}</div>
-                      <div>コントラスト: {analysisResult.debugData.avgContrast.toFixed(6)}</div>
-                      <div>緑プッシュ: {analysisResult.debugData.avgGreenPush.toFixed(6)}</div>
-                      <div>{`閾値判定: warmBias > 0.06 = ${analysisResult.debugData.avgWarmBias > 0.06 ? 'true' : 'false'}`}</div>
-                      <div>{`閾値判定: contrast > 0.12 = ${analysisResult.debugData.avgContrast > 0.12 ? 'true' : 'false'}`}</div>
-                      <div>{`閾値判定: warmBias > 0.03 = ${analysisResult.debugData.avgWarmBias > 0.03 ? 'true' : 'false'}`}</div>
-                    </div>
-                  </details>
-                )}
+                </details>
               </div>
             )}
           </div>
@@ -252,7 +316,7 @@ export default function Home() {
       <footer className="border-t border-glaze-border mt-16 px-6 py-6">
         <div className="max-w-6xl mx-auto text-center">
           <p className="text-glaze-text-muted text-sm">
-            💡 使い方: Photoshopで推奨されたLUTを上から順番に適用し、指定の不透明度に設定してください
+            💡 使い方: お好みの方向性を選択し、Sequential Cascade方式で上から順番にLUTを適用してください
           </p>
         </div>
       </footer>
