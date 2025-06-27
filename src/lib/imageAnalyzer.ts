@@ -4,38 +4,38 @@
  * RGB基本分析 + 全20個LUT対応ブレンドレシピ生成
  */
 
-// 全20個LUTのデータベース（方向性別分類）
+// 全20個LUTのデータベース（方向性別分類 + 推奨強度範囲）
 const LUT_DATABASE = {
   // ベースLUT - 主要な色調担当
   base_luts: {
-    "Maverick.cube": {warmth: 0.85, contrast: 0.6, intensity: 0.8, mood: "cinematic"},
-    "F-PRO400H.cube": {warmth: 0.65, contrast: 0.7, intensity: 0.7, mood: "natural"},
-    "K-Chrome.cube": {warmth: 0.45, contrast: 0.6, intensity: 0.6, mood: "clean"},
-    "Anderson.cube": {warmth: 0.75, contrast: 0.8, intensity: 0.9, mood: "dramatic"},
-    "Nolan.cube": {warmth: 0.2, contrast: 0.9, intensity: 0.8, mood: "cold"},
-    "Blue sierra.cube": {warmth: 0.15, contrast: 0.7, intensity: 0.6, mood: "cool"},
-    "C-400D.cube": {warmth: 0.3, contrast: 0.5, intensity: 0.5, mood: "vintage"},
-    "k-ektar.cube": {warmth: 0.4, contrast: 0.6, intensity: 0.6, mood: "classic"}
+    "Maverick.cube": {warmth: 0.85, contrast: 0.6, intensity: 0.8, mood: "cinematic", recommended_range: [15, 35]}, // 薄くかける系
+    "F-PRO400H.cube": {warmth: 0.65, contrast: 0.7, intensity: 0.7, mood: "natural", recommended_range: [50, 80]},
+    "K-Chrome.cube": {warmth: 0.45, contrast: 0.6, intensity: 0.6, mood: "clean", recommended_range: [60, 85]},
+    "Anderson.cube": {warmth: 0.75, contrast: 0.8, intensity: 0.9, mood: "dramatic", recommended_range: [45, 75]},
+    "Nolan.cube": {warmth: 0.2, contrast: 0.9, intensity: 0.8, mood: "cold", recommended_range: [20, 40]}, // 薄くかける系
+    "Blue sierra.cube": {warmth: 0.15, contrast: 0.7, intensity: 0.6, mood: "cool", recommended_range: [40, 70]},
+    "C-400D.cube": {warmth: 0.3, contrast: 0.5, intensity: 0.5, mood: "vintage", recommended_range: [55, 80]},
+    "k-ektar.cube": {warmth: 0.4, contrast: 0.6, intensity: 0.6, mood: "classic", recommended_range: [50, 75]}
   },
   
   // 調整LUT - コントラスト・明度担当
   adjustment_luts: {
-    "clean contrast.cube": {contrast_boost: 0.9, clarity: 0.8, strength: 0.7},
-    "highland.cube": {contrast_boost: 0.6, clarity: 0.7, strength: 0.6},
-    "Odyssey.cube": {contrast_boost: 0.7, clarity: 0.6, strength: 0.8},
-    "Revenant.cube": {contrast_boost: 0.8, clarity: 0.9, strength: 0.7},
-    "pastel-light.cube": {contrast_boost: 0.3, clarity: 0.4, strength: 0.4},
-    "Smorky silversalt.cube": {contrast_boost: 0.5, clarity: 0.6, strength: 0.5}
+    "clean contrast.cube": {contrast_boost: 0.9, clarity: 0.8, strength: 0.7, recommended_range: [25, 50]},
+    "highland.cube": {contrast_boost: 0.6, clarity: 0.7, strength: 0.6, recommended_range: [30, 60]},
+    "Odyssey.cube": {contrast_boost: 0.7, clarity: 0.6, strength: 0.8, recommended_range: [15, 35]}, // 薄くかける系
+    "Revenant.cube": {contrast_boost: 0.8, clarity: 0.9, strength: 0.7, recommended_range: [20, 40]}, // 薄くかける系
+    "pastel-light.cube": {contrast_boost: 0.3, clarity: 0.4, strength: 0.4, recommended_range: [35, 65]},
+    "Smorky silversalt.cube": {contrast_boost: 0.5, clarity: 0.6, strength: 0.5, recommended_range: [25, 55]}
   },
   
   // エフェクトLUT - 特殊効果担当
   effect_luts: {
-    "anime pastel.cube": {creativity: 0.9, stylization: 0.8, uniqueness: 0.9},
-    "cyber neon.cube": {creativity: 0.8, stylization: 0.9, uniqueness: 0.8},
-    "Blade neon.cube": {creativity: 0.7, stylization: 0.8, uniqueness: 0.7},
-    "blue moment.cube": {creativity: 0.6, stylization: 0.6, uniqueness: 0.6},
-    "D-Anderson.cube": {creativity: 0.7, stylization: 0.7, uniqueness: 0.8},
-    "L-green.cube": {creativity: 0.4, stylization: 0.5, uniqueness: 0.5}
+    "anime pastel.cube": {creativity: 0.9, stylization: 0.8, uniqueness: 0.9, recommended_range: [15, 35]},
+    "cyber neon.cube": {creativity: 0.8, stylization: 0.9, uniqueness: 0.8, recommended_range: [10, 25]},
+    "Blade neon.cube": {creativity: 0.7, stylization: 0.8, uniqueness: 0.7, recommended_range: [12, 30]},
+    "blue moment.cube": {creativity: 0.6, stylization: 0.6, uniqueness: 0.6, recommended_range: [20, 45]},
+    "D-Anderson.cube": {creativity: 0.7, stylization: 0.7, uniqueness: 0.8, recommended_range: [15, 40]},
+    "L-green.cube": {creativity: 0.4, stylization: 0.5, uniqueness: 0.5, recommended_range: [8, 25]}
   }
 };
 
@@ -129,25 +129,28 @@ interface BaseLutProperties {
   contrast: number;
   intensity: number;
   mood: string;
+  recommended_range: [number, number];
 }
 
 interface AdjustmentLutProperties {
   contrast_boost: number;
   clarity: number;
   strength: number;
+  recommended_range: [number, number];
 }
 
 interface EffectLutProperties {
   creativity: number;
   stylization: number;
   uniqueness: number;
+  recommended_range: [number, number];
 }
 
 type LutProperties = BaseLutProperties | AdjustmentLutProperties | EffectLutProperties;
 
-interface LutDatabase {
-  [key: string]: LutProperties;
-}
+// interface LutDatabase {
+//   [key: string]: LutProperties;
+// }
 
 // Legacy interface for backward compatibility
 export interface LUTRecommendation {
@@ -344,12 +347,16 @@ function calculateLutAffinity(photoAnalysis: MultiImageAnalysisResult, lutName: 
 }
 
 /**
- * 親和性スコアに基づく適用強度計算
+ * LUT個別の推奨範囲に基づく適用強度計算
  */
-function calculateBlendStrength(affinityScore: number, baseStrength: number = 70): number {
-  // スコアに応じて40-85%の範囲で調整
-  const strength = baseStrength + (affinityScore - 0.5) * 30;
-  return Math.max(40, Math.min(85, Math.round(strength)));
+function calculateBlendStrength(affinityScore: number, lutProperties: LutProperties): number {
+  const [minStrength, maxStrength] = lutProperties.recommended_range;
+  
+  // 親和性スコア（0-1）を推奨範囲内でマッピング
+  // スコアが高いほど範囲内の高い値を使用
+  const strength = minStrength + (affinityScore * (maxStrength - minStrength));
+  
+  return Math.round(strength);
 }
 
 /**
@@ -379,7 +386,7 @@ export function generateBlendRecipes(photoAnalysis: MultiImageAnalysisResult): B
       // 優先順位に従ってLUTを評価
       for (const lutName of priority) {
         if (lutName in database) {
-          const score = calculateLutAffinity(photoAnalysis, lutName, (database as LutDatabase)[lutName], category);
+          const score = calculateLutAffinity(photoAnalysis, lutName, database[lutName as keyof typeof database], category);
           if (score > bestScore) {
             bestScore = score;
             bestLut = lutName;
@@ -398,16 +405,10 @@ export function generateBlendRecipes(photoAnalysis: MultiImageAnalysisResult): B
         }
       }
       
-      // ブレンド強度計算
+      // ブレンド強度計算（LUT個別の推奨範囲を使用）
       if (bestLut) {
-        let strength: number;
-        if (category === "base") {
-          strength = calculateBlendStrength(bestScore, 75);
-        } else if (category === "adjustment") {
-          strength = calculateBlendStrength(bestScore, 40);
-        } else { // effect
-          strength = calculateBlendStrength(bestScore, 25);
-        }
+        const lutProperties = database[bestLut as keyof typeof database];
+        const strength = calculateBlendStrength(bestScore, lutProperties);
         
         recipe.blend.push({
           category,
