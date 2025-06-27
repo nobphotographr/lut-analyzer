@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# LUT files (exclude actual .cube files but keep directory structure)
+public/luts/*.cube
+public/luts/*/*.cube
